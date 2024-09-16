@@ -96,6 +96,50 @@ transaction_category_labels = pd.DataFrame({
     'Category': np.random.choice(['Food', 'Retail', 'Travel', 'Online', 'Other'], 1500)
 })
 
+
+# Modifications pour introduire des biais dans les données
+
+# 1. Transactions élevées et rares comme suspectes
+# Définir une transaction comme élevée si le montant est supérieur à un certain seuil, par exemple 150
+high_value_threshold = 150
+# Marquer comme suspect si le montant est élevé et rare (1% des transactions les plus rares)
+high_value_transactions = transaction_records[(transaction_records['Amount'] > high_value_threshold)]
+
+# Ajuster le FraudIndicator pour ces transactions (probabilité accrue)
+transaction_records.loc[high_value_transactions.index, 'FraudIndicator'] = np.random.choice(
+    [0, 1], size=len(high_value_transactions), p=[0.3, 0.7])
+
+# 2. Jeunes effectuant des transactions importantes comme suspects
+# Définir "jeunes" comme ayant moins de 25 ans et montant élevé
+young_threshold = 25
+young_customers = customer_data[customer_data['Age'] < young_threshold]
+# Associer ces jeunes clients aux transactions importantes
+high_value_young_transactions = transaction_records[
+    (transaction_records['CustomerID'].isin(young_customers['CustomerID'])) & 
+    (transaction_records['Amount'] > high_value_threshold)]
+
+# Augmenter la probabilité de fraude pour ces cas
+transaction_records.loc[high_value_young_transactions.index, 'FraudIndicator'] = np.random.choice(
+    [0, 1], size=len(high_value_young_transactions), p=[0.2, 0.8])
+
+# 3. Corréler AnomalyScore et SuspiciousFlag avec FraudIndicator
+# Augmenter l'anomaly score pour les transactions marquées comme fraude
+transaction_records['AnomalyScore'] = np.where(transaction_records['FraudIndicator'] == 1,
+                                               np.random.uniform(0.7, 1.0, len(transaction_records)),
+                                               np.random.uniform(0.0, 0.5, len(transaction_records)))
+
+# Augmenter les flags suspects pour les fraudes
+transaction_records['SuspiciousFlag'] = np.where(transaction_records['FraudIndicator'] == 1,
+                                                 np.random.choice([0, 1], size=len(transaction_records), p=[0.1, 0.9]),
+                                                 np.random.choice([0, 1], size=len(transaction_records), p=[0.9, 0.1]))
+
+# Mettre à jour les DataFrames en fonction des modifications
+fraud_indicators = transaction_records[['TransactionID', 'FraudIndicator']]
+anomaly_scores = transaction_records[['TransactionID', 'AnomalyScore']]
+suspicious_activity = transaction_records[['CustomerID', 'SuspiciousFlag']].drop_duplicates()
+
+
+
 # Save the generated data into CSV files
 transaction_records.to_csv('Folder1/transaction_records.csv', index=False)
 transaction_metadata.to_csv('Folder1/transaction_metadata.csv', index=False)
